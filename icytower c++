@@ -1,0 +1,1662 @@
+#include <SFML/Window.hpp>
+#include<SFML/Network.hpp>
+#include<SFML/System.hpp>
+#include<SFML/Audio.hpp>
+#include<SFML/Graphics.hpp>
+#include<iostream>
+#include<string>
+#include<random>
+#include<cstdlib>
+#include<vector>
+#include<queue>
+#include<fstream>
+#include<ctime>
+#include <SFML/OpenGL.hpp>
+#include <sstream> 
+using namespace std;
+using namespace sf;
+bool intro = true;
+static Music BacKgroundMusic;
+bool music = true;
+RenderWindow window(sf::VideoMode(1100, 800), "ICY TOWER", Style::Default);
+int jumpspeed = -18;
+bool chooseplayer1 = false;
+float speed = 15;
+const float runacc = .25f;
+const float jumpacc = -1;
+const unsigned int jumpframes = 10;
+unsigned int jumpcounter = 0; 
+Vector2i bodysize(92, 56);
+float x = 0;
+float y = 0;
+int score = 0;
+const float maxfall = 5;   // max fall velocity
+void Start();
+void mainmenu();
+void Credits();
+void chooseplayer();
+void Controls();
+void gameover();
+void pauseMenu();
+void Parallex(Sprite Object[], bool& Move0, bool& Move1, float& Speed, RenderWindow& GameWindow)
+{
+	if (Move0)
+	{
+		Object[0].move(-Speed, 0);
+	}
+	if (Move1)
+	{
+		Object[1].move(-Speed, 0);
+	}
+	if (Object[0].getPosition().x <= GameWindow.getSize().x - Object[0].getGlobalBounds().width)
+	{
+		Move1 = true;
+	}
+	if (Object[1].getPosition().x <= GameWindow.getSize().x - Object[1].getGlobalBounds().width)
+	{
+		Move0 = true;
+	}
+	if (Object[0].getPosition().x <= -Object[0].getGlobalBounds().width)
+	{
+		Move0 = false;
+		Object[0].setPosition(GameWindow.getSize().x, 0);
+	}
+	if (Object[1].getPosition().x <= -Object[1].getGlobalBounds().width)
+	{
+		Move1 = false;
+		Object[1].setPosition(GameWindow.getSize().x, 0);
+	}
+}
+// Add Player
+void AddPlayer(string name, int score)
+{
+	ofstream records;
+	records.open("records.txt", ios::app);
+	records << name << "\t\t\t" << score << endl;
+
+}
+// Check Name
+bool Search(string name)
+{
+	ifstream records;
+	string str;
+	vector<string> strs;
+	records.open("records.txt", ios::app);
+	while (!records.eof()) {
+		getline(records, str);
+		if (str.size() > 4)
+			str.erase(str.size() - 4, str.size());
+		strs.push_back(str);
+		if (name == str) {
+			return 1;
+		}
+	}
+	for (int i = 0; i < strs.size(); ++i) {
+		if (strs[i] == name)return 1;
+	}
+
+	return 0;
+}
+//getText
+void getText(RenderWindow& win, int score)
+{
+	RectangleShape textbox, Button;
+	//textbox
+	textbox.setSize(Vector2f(300.0f, 70.0f));
+	textbox.setPosition(win.getSize().x / 2 - 170, win.getSize().y / 2 - 50);
+	textbox.setFillColor(Color::Transparent);
+	textbox.setOutlineColor(Color::Cyan);
+	textbox.setOutlineThickness(5);
+
+	//button
+	Button.setSize(Vector2f(100.0f, 50.0f));
+	Button.setPosition(textbox.getPosition().x + 165, textbox.getPosition().y + 100);
+	Button.setFillColor(Color::Transparent);
+
+	//texts
+	Font font;
+	font.loadFromFile("fonts/CURLZ___.TTF");
+	Font font2;
+	font2.loadFromFile("fonts/BERNHC.TTF");
+	Texture titleTx, addButtonTx;
+	Sprite title, addButton;
+	titleTx.loadFromFile("Textures/player select button.png");
+	title.setTexture(titleTx);
+	title.setPosition(150, 50);
+	addButtonTx.loadFromFile("Textures/add button.png");
+	addButton.setTexture(addButtonTx);
+	addButton.setPosition(Button.getPosition().x - 40, Button.getPosition().y + 10);
+	Text label;
+	label.setFont(font2);
+	label.setPosition(textbox.getPosition().x - 60, textbox.getPosition().y - 70);
+	label.setString("PLEASE ,ENTER YOUR NAME :");
+	label.setCharacterSize(40);
+
+	//variables
+	string name;
+	vector<Text> playerName;
+	Text letter;
+	letter.setFont(font2);
+
+	Event evnt;
+
+	while (win.isOpen())
+	{
+		while (win.pollEvent(evnt)) {
+			if (evnt.type == Event::Closed) {
+				win.close();
+			}
+			// get text
+			if (evnt.type == Event::TextEntered && evnt.text.unicode < 128 && name.size() < 15) {
+				cout << static_cast<char>(evnt.text.unicode);
+				if (static_cast<char>(evnt.text.unicode) != '\r') {
+					letter.setString(static_cast<char>(evnt.text.unicode));
+					playerName.push_back(letter);
+					name += static_cast<char>(evnt.text.unicode);
+				}
+			}
+			//edit text
+			Keyboard key;
+			if (key.isKeyPressed(Keyboard::BackSpace) && !playerName.empty()) {
+				name.erase(name.size() - 1, name.size());
+				playerName.pop_back();
+			}
+			//Button activaion
+			Mouse mouse;
+			if (mouse.isButtonPressed(Mouse::Left) && (mouse.getPosition().x >= 667.0 &&
+				mouse.getPosition().x <= 764.0)
+				&& (mouse.getPosition().y >= 465.0 && mouse.getPosition().y <= 513.0) &&
+				!playerName.empty() || (evnt.type == Event::KeyReleased && evnt.key.code == Keyboard::Return)) {
+				if (!Search(name) && name != "")
+					AddPlayer(name, score);
+				else cout << "\ninvalid player\n";
+				playerName.clear();
+				name = "";
+				cout << "\nplayer added successfully";
+				return;
+			}
+		}
+
+
+		//display
+		win.clear();
+		// print username
+		int space = 0;
+		for (int i = 0; i < playerName.size(); ++i) {
+			playerName[i].setPosition(textbox.getPosition().x + space, textbox.getPosition().y);
+			win.draw(playerName[i]);
+			space += playerName[i].getGlobalBounds().width + 1;
+			//	cout << space << endl;
+		}
+		win.draw(title);
+		win.draw(label);
+		win.draw(textbox);
+		win.draw(Button);
+		win.draw(addButton);
+		win.display();
+	}
+
+}
+bool leaderBoards(vector<pair<Text, Text>> vec, RenderWindow& leads)
+{
+	leads.setFramerateLimit(60);
+	Text title;
+	Font font;
+	font.loadFromFile("C:/Windows/Fonts/Arial.ttf");
+	title.setString("Player Name        Score");
+	title.setFont(font);
+	title.setPosition(leads.getPosition().x / 2, 100);
+	while (leads.isOpen()) {
+		Event evnt;
+		while (leads.pollEvent(evnt)) {
+			if (evnt.type == Event::Closed) {
+				leads.close();
+			}
+			if (Keyboard::isKeyPressed(Keyboard::Escape))
+			{
+				return true;
+			}
+			leads.clear(Color::Black);
+			for (int i = 0; i < vec.size(); ++i) {
+				Text name, score, rank;
+				rank.setFont(font);
+				name = vec[i].first;
+				score = vec[i].second;
+				rank.setString(to_string(i + 1));
+				name.setCharacterSize(15);
+				score.setCharacterSize(15);
+				rank.setCharacterSize(15);
+				rank.setPosition(20 + leads.getPosition().x / 2, 150 + (i * 30));
+				name.setPosition(50 + leads.getPosition().x / 2, 150 + (i * 30));
+				score.setPosition(300 + leads.getPosition().x / 2, 150 + (i * 30));
+				leads.draw(title);
+				leads.draw(rank);
+				leads.draw(name);
+				leads.draw(score);
+
+			}
+			leads.display();
+		}
+	}
+}
+// Retrieve Data
+void Retrieve()
+{
+	RenderWindow leadd(VideoMode(1100, 800), "leaderboards");
+	priority_queue<pair<string, string>> leads;
+	ifstream records;
+	string name, score;
+	vector <pair <Text, Text>> vec;
+	Text n, s;
+	Font font;
+	font.loadFromFile("C:/Windows/Fonts/Arial.ttf");
+	n.setFont(font);
+	s.setFont(font);
+	records.open("records.txt", ios::app);
+	while (!records.eof()) {
+		records >> name;
+		records.seekg(3);
+		records >> score;
+		leads.push(pair<string, string>(score, name));
+	}
+	while (!leads.empty()) {
+		n.setString(leads.top().first);
+		s.setString(leads.top().second);
+		vec.push_back(pair<Text, Text>(s, n));
+		leads.pop();
+	}
+	leaderBoards(vec, leadd);
+	if (leaderBoards(vec, leadd))
+	{
+		return;
+	}
+}
+void SoundEffects(string Path)
+{
+	static SoundBuffer buffer;
+    static Sound sound;
+	buffer.loadFromFile(Path);
+	sound.setBuffer(buffer);
+    sound.play(); 
+	if (Path == "gameover") {
+		sound.pause();
+	}
+}
+void Texts(RenderWindow& window, String Fontpath, String string, int positionx,int positiony, int size){
+	Font font1;
+	font1.loadFromFile(Fontpath);
+	Text text1; 
+	text1.setFont(font1); 
+	text1.setString(string);
+	text1.setPosition(positionx, positiony);
+	text1.setCharacterSize(size); 
+	text1.setFillColor(Color::White);
+	window.draw(text1); 
+}
+void enemy(RenderWindow& win) {
+	int counter0 = 0;
+	Texture enet[4], bullet;
+	bullet.loadFromFile("Boy with Slingshot/stone.png");
+	for (int i = 0; i < 4; i++) { 
+		enet[i].loadFromFile("Boy with Slingshot/Stay Attack/StayAttack" + to_string(i + 1) + ".png"); 
+	}
+	Sprite ene;
+	if (counter0 >= 3) {
+		counter0++;
+	}
+	else {
+		counter0 = 0;
+	}
+	ene.setTexture(enet[counter0]);  
+
+}
+int main() 
+{  
+	BacKgroundMusic.openFromFile("audio/src_assets_ThemeSong.wav");
+	BacKgroundMusic.setLoop(true);
+	BacKgroundMusic.setVolume(60);
+	BacKgroundMusic.play();
+   mainmenu();
+    return 0;  
+}
+void mainmenu() {
+	sf::RenderWindow window8(sf::VideoMode(1100, 800), "ICY TOWER", Style::Default);
+	window8.setFramerateLimit(60);
+	bool Menu = true;
+	//MainMenu
+	Texture MainMenuTex, bmotex, logotex;
+	Sprite MainMenu;
+	MainMenuTex.loadFromFile("background/36600.jpg");
+	MainMenu.setTexture(MainMenuTex);
+	//MainMenu.setPosition(-0, 0);
+	MainMenu.setTextureRect(IntRect(0, 0, 1100, 800));
+	bmotex.loadFromFile("background/paper.png");
+	Sprite bmo(bmotex);
+	bmo.setPosition(45, 70);
+	logotex.loadFromFile("background/logo3.png");
+	Sprite logo;
+	logo.setTexture(logotex);
+	logo.setPosition(690, -40);
+	Texture rorot;
+	rorot.loadFromFile("skater boy/mainboy.png");
+	Sprite roro(rorot);
+	roro.setPosition(560, 275);
+	Texture girlot;
+	girlot.loadFromFile("skater girl/indy grab/skater girl-indy grab_0.png");
+	Sprite girlo(girlot);
+	girlo.setPosition(40, -90);
+	int counter2 = 0;
+	//PlayButton
+	Texture PlayButtonTex;
+	Sprite PlayButton;
+	PlayButtonTex.loadFromFile("Textures/play button.png");
+	PlayButton.setTexture(PlayButtonTex);
+	PlayButton.setPosition(100.f, 150.f);
+	PlayButton.setScale(2.f, 2.f);
+
+	//LeaderBoardButton
+	Texture LeaderBoardButtonTex;
+	Sprite LeaderBoardButton;
+	LeaderBoardButtonTex.loadFromFile("Textures/leaderboard button.png");
+	LeaderBoardButton.setTexture(LeaderBoardButtonTex);
+	LeaderBoardButton.setPosition(100.f, 250.f);
+	LeaderBoardButton.setScale(2.f, 2.f);
+	
+	//Controls Button
+	Texture ControlsButtonTex;
+	Sprite ControlsButton;
+	ControlsButtonTex.loadFromFile("Textures/leaderboard button.png");
+	ControlsButton.setTexture(ControlsButtonTex);
+	ControlsButton.setPosition(100.f, 350.f);
+	ControlsButton.setScale(2.f, 2.f);
+
+	//CreditsButton
+	Texture CreditsButtonTex;
+	Sprite CreditsButton;
+	CreditsButtonTex.loadFromFile("Textures/leaderboard button.png");
+	CreditsButton.setTexture(CreditsButtonTex);
+	CreditsButton.setPosition(100.f, 450.f);
+	CreditsButton.scale(2.f, 2.f);
+
+	//Exit Button
+	Texture ExitButtonTex;
+	Sprite ExitButton;
+	ExitButtonTex.loadFromFile("Textures/leaderboard button.png");
+	ExitButton.setTexture(ExitButtonTex);
+	ExitButton.setPosition(100.f, 550.f);
+	ExitButton.setScale(2.f, 2.f);
+	// Cursor
+	CircleShape Cursor;
+	Cursor.setPosition(110.f, 160.f);
+	Cursor.setRadius(5.f);
+	Cursor.setFillColor(Color::Transparent);
+	//Arrows
+	Texture ArrowTexture[8];
+	ArrowTexture[0].loadFromFile("Textures/up arrow miss.png");
+	ArrowTexture[1].loadFromFile("Textures/right arrow miss.png");
+	ArrowTexture[2].loadFromFile("Textures/down arrow  miss.png");
+	ArrowTexture[3].loadFromFile("Textures/left arrow miss.png");
+	for (int i = 4; i < 8; i++)
+	{
+		ArrowTexture[i].loadFromFile("Textures/" + to_string(i - 4) + ".png");
+	}
+	Sprite Arrow;
+	Arrow.setPosition(575.f, 25.f);
+	Arrow.setScale(4.f, 4.f);
+	//Navigation System
+	//Menu
+	Clock PressTimer;
+	while (window8.isOpen())
+	{
+		sf::Event event;
+		while (window8.pollEvent(event))
+		{
+			if (event.type == sf::Event::Closed)
+			{
+				window8.close();
+			}
+		}
+		if (Keyboard::isKeyPressed(Keyboard::Up) && Cursor.getPosition().y > 160 && PressTimer.getElapsedTime().asSeconds() > 0.2)
+		{
+			Cursor.move(0.f, -100.f);
+			PressTimer.restart();
+		}
+
+		if (Keyboard::isKeyPressed(Keyboard::Down) && Cursor.getPosition().y < 550 && PressTimer.getElapsedTime().asSeconds()>0.2)
+		{
+			Cursor.move(0.f, 100.f);
+			PressTimer.restart();
+		}
+		if (Keyboard::isKeyPressed(Keyboard::Up) && Cursor.getPosition().y == 190)
+		{
+			Cursor.move(0.f, 300.f);
+			PressTimer.restart();
+		}
+
+		//PlayButton
+		if (Cursor.getGlobalBounds().intersects(PlayButton.getGlobalBounds())) {
+			PlayButtonTex.loadFromFile("Textures/play button highlighted.png");
+			if (Keyboard::isKeyPressed(Keyboard::Return)) {
+				window8.close();
+				chooseplayer();
+			}
+		}
+		else
+		{
+			PlayButtonTex.loadFromFile("Textures/play button.png");
+		}
+		//LeaderBoardButton
+		if (Cursor.getGlobalBounds().intersects(LeaderBoardButton.getGlobalBounds())) {
+			LeaderBoardButtonTex.loadFromFile("Textures/leaderboard button highlighted.png");
+			if (Keyboard::isKeyPressed(Keyboard::Return)) {
+				Retrieve();
+			}
+		}
+		else
+		{
+			LeaderBoardButtonTex.loadFromFile("Textures/leaderboard button.png");
+		}
+
+		//ControlsButton
+		if (Cursor.getGlobalBounds().intersects(ControlsButton.getGlobalBounds())) {
+			ControlsButtonTex.loadFromFile("Textures/Controls button highlighted.png");
+			if (Keyboard::isKeyPressed(Keyboard::Return)) {
+				window8.close();
+				Controls();
+			}
+		}
+		else
+		{
+			ControlsButtonTex.loadFromFile("Textures/Controls button.png");
+		}
+
+		//CreditsButton
+		if (Cursor.getGlobalBounds().intersects(CreditsButton.getGlobalBounds())) {
+			CreditsButtonTex.loadFromFile("Textures/Credits button highlighted.png");
+			if (Keyboard::isKeyPressed(Keyboard::Return)) {
+				window8.close();
+				Credits();
+			}
+		}
+		else
+		{
+			CreditsButtonTex.loadFromFile("Textures/Credits button.png");
+		}
+
+		//ExitButton
+		if (Cursor.getGlobalBounds().intersects(ExitButton.getGlobalBounds())) {
+			ExitButtonTex.loadFromFile("Textures/Exit button highlighted.png");
+			if (Keyboard::isKeyPressed(Keyboard::Return)) {
+				window8.close();
+			}
+		}
+		else
+		{
+			ExitButtonTex.loadFromFile("Textures/Exit button.png");
+		}
+		window8.clear(Color::White);
+		window8.draw(MainMenu);
+		//window8.draw(bmo);
+		window8.draw(logo);
+		window8.draw(PlayButton);
+		window8.draw(LeaderBoardButton);
+		window8.draw(CreditsButton);
+		window8.draw(ControlsButton);
+		window8.draw(ExitButton);
+		//window8.draw(Cursor);
+		window8.draw(roro);
+		window8.draw(girlo);
+		window8.display();
+	}
+}
+void chooseplayer() {
+	sf::RenderWindow window9(sf::VideoMode(1100, 800), "SFML WORK!");
+	window9.setFramerateLimit(60);
+
+	window9.setVerticalSyncEnabled(false);
+	Clock PressTimer;
+	// choose player
+	//BackGround
+	Texture BackgroundTexture[3];
+	Sprite Sky[2];
+	Sprite Buildings[2];
+	Sprite Tracks[2];
+	bool ParallexBool[6] = { 1,0,1,0,1,0 };
+	float IntialTrackSpeed = 3;	float TracksSpeed = IntialTrackSpeed;
+	float IntialBuildingSpeed = 0.8; float BuildingSpeed = IntialBuildingSpeed;
+	float IntialSkySpeed = 0.5;	float SkySpeed = IntialSkySpeed;
+	for (int i = 0; i < 3; i++)
+	{
+		BackgroundTexture[i].loadFromFile("Textures/Background " + to_string(i + 1) + ".png");
+	}
+
+	for (int i = 0; i < 2; i++)
+	{
+		Tracks[i].setTexture(BackgroundTexture[2]);
+		if (i == 0)
+		{
+			Tracks[i].setPosition(0, 0);
+		}
+		else { Tracks[i].setPosition(window9.getSize().x, 0); }
+	}
+
+	for (int i = 0; i < 2; i++)
+	{
+		Sky[i].setTexture(BackgroundTexture[0]);
+		if (i == 0)
+		{
+			Sky[i].setPosition(0, 0);
+		}
+		else { Sky[i].setPosition(window9.getSize().x, 0); }
+	}
+
+	for (int i = 0; i < 2; i++)
+	{
+		Buildings[i].setTexture(BackgroundTexture[1]);
+		if (i == 0)
+		{
+			Buildings[i].setPosition(0, 0);
+		}
+		else { Buildings[i].setPosition(window9.getSize().x, 0); }
+	}
+	
+
+	Font instructionsf;
+	instructionsf.loadFromFile("fonts/ITCKRIST.TTF");
+	Texture choosetex, logotex, player1t, player2t, chooseplayerbuttont;
+	/*Sprite choosplayersp;
+	choosetex.loadFromFile("background/36600.jpg");
+	choosplayersp.setTexture(choosetex);
+	choosplayersp.setTextureRect(IntRect(0, 0, 1100, 800));
+	logotex.loadFromFile("background/logo3.png");*/
+	Sprite logo;
+	logo.setTexture(logotex);
+	logo.setPosition(690, -40);
+	player1t.loadFromFile("skater boy/idle/skater boy-idle28 (1).png");
+	player2t.loadFromFile("skater girl/roll B/skater girl-roll B_0.png");
+	Sprite player1(player1t), player2(player2t);
+	player1.setPosition(Vector2f(375, 485));
+	player2.setPosition(Vector2f(109, 490));
+	chooseplayerbuttont.loadFromFile("Textures/select character.png");
+	Sprite chooseplayerbutton(chooseplayerbuttont);
+	chooseplayerbutton.setPosition(Vector2f(46, 34));
+	chooseplayerbutton.setScale(1.5f, 1.5f);
+	// Cursor
+	CircleShape Cursor2;
+	Cursor2.setPosition(83.f, 451.f);
+	Cursor2.setRadius(5.f);
+	Cursor2.setFillColor(Color(255, 0, 192));
+	Text charactername;
+	charactername.setFont(instructionsf);
+	charactername.scale(0.9f, 0.9f);
+	charactername.setString("Skater Girl");
+	charactername.setPosition(150.f, 431.f);
+	charactername.setFillColor(Color(255, 0, 192));
+	bool player1selcted = false;
+	bool player2selcted = true;
+	int chosen = 2;
+	//player 1 running
+	Texture player2_run2[19];
+	for (int i = 0; i < 18; i++)
+	{
+		player2_run2[i].loadFromFile("skater girl/push single/skater girl-push single_0" + to_string(i + 1) + ".png");
+	}
+	Texture player1_run[19];
+	for (int i = 0; i < 18; i++)
+	{
+		player1_run[i].loadFromFile("skater boy/roll/skater boy-roll" + to_string(i + 1) + ".png");
+	}
+	int counter = 0;
+	Sprite player_spriterun;
+	while (window9.isOpen())
+	{
+		sf::Event event;
+
+		while (window9.pollEvent(event))
+		{
+			if (event.type == Event::Closed) {
+				window9.close();
+			}
+
+		}
+		if (Keyboard::isKeyPressed(Keyboard::Right) && Cursor2.getPosition().y > 83 && PressTimer.getElapsedTime().asSeconds() > 0.2)
+		{
+			Cursor2.move(237.f, 0.f);
+			Cursor2.setFillColor(Color::Red);
+			charactername.setString("Skater Boy");
+			charactername.move(297.f, 0.f);
+			charactername.setFillColor(Color::Red);
+			PressTimer.restart();
+			if (Keyboard::isKeyPressed(Keyboard::Right) && Cursor2.getPosition().y > 320) {
+				Cursor2.setPosition(320, Cursor2.getPosition().y);
+				charactername.setPosition(370, charactername.getPosition().y);
+			}
+		}
+		if (Keyboard::isKeyPressed(Keyboard::Left) && Cursor2.getPosition().y > 325 && PressTimer.getElapsedTime().asSeconds() > 0.2)
+		{
+			Cursor2.move(-237.f, 0.f);
+			Cursor2.setFillColor(Color(255, 0, 192));
+			charactername.setString("Skater Girl");
+			charactername.move(-207.f, 0.f);
+			charactername.setFillColor(Color(255, 0, 192));
+			PressTimer.restart();
+			if (Keyboard::isKeyPressed(Keyboard::Left) && Cursor2.getPosition().y > 88) {
+				Cursor2.setPosition(87, Cursor2.getPosition().y);
+				charactername.setPosition(150, charactername.getPosition().y);
+			}
+		}
+		if (Event::KeyReleased && event.key.code == Keyboard::Return && Cursor2.getPosition().x == 320) {
+			Cursor2.setFillColor(Color::Transparent);
+			charactername.setFillColor(Color::Transparent);
+			player_spriterun.setScale(1, 1);
+			if (counter < 17) {
+				counter++;
+			}
+			else {
+				counter = 0;
+			}
+			player1.setTexture(player1_run[counter]);
+			player1.move(10, 0);
+			chooseplayer1 = true;
+			PressTimer.restart();
+		}
+		if (Event::KeyReleased && event.key.code == Keyboard::Return && (Cursor2.getPosition().x == 87)) {
+			Cursor2.setFillColor(Color::Transparent);
+			charactername.setFillColor(Color::Transparent);
+			player_spriterun.setScale(1, 1);
+			if (counter < 17) {
+				counter++;
+			}
+			else {
+				counter = 0;
+			}
+			player2.setTexture(player2_run2[counter]);
+			player2.move(10, 0);
+			// if player 2 selected (girlo)
+			chooseplayer1 = false;
+		}
+		if (Keyboard::isKeyPressed(Keyboard::Escape)) {
+			window9.close();
+			mainmenu();
+		}
+		if (player1.getPosition().x > 1100 || player2.getPosition().x > 1100) {
+			cout << "player out \n";
+			window9.close();
+			Start();
+		}
+		Parallex(Tracks, ParallexBool[0], ParallexBool[1], TracksSpeed, window9);
+		Parallex(Sky, ParallexBool[2], ParallexBool[3], SkySpeed, window9);
+		Parallex(Buildings, ParallexBool[4], ParallexBool[5], BuildingSpeed, window9);
+		window9.clear(Color::White);
+		//window9.draw(choosplayersp);
+		for (int i = 0; i < 2; i++)
+		{
+			window9.draw(Sky[i]);
+		}
+		for (int i = 0; i < 2; i++)
+		{
+			window9.draw(Buildings[i]);
+		}
+		for (int i = 0; i < 2; i++)
+		{
+			window9.draw(Tracks[i]);
+		}
+		window9.draw(logo);
+		window9.draw(chooseplayerbutton);
+		window9.draw(player1);
+		window9.draw(player2);
+		window9.draw(charactername); 
+		window9.display(); 
+	}
+}
+void Start()  {
+	getText(window, score);
+	SoundBuffer buffer2;
+	buffer2.loadFromFile("audio/Loyalty.wav");
+	Sound startsound;
+	startsound.setBuffer(buffer2);
+	startsound.setVolume(20);
+	startsound.play(); 
+	BacKgroundMusic.pause();
+	SoundEffects("Start");
+	String scorest;
+	unsigned int height = 800, width = 1100;
+	float speed = 15;
+	const float runacc = .25f;
+	const float jumpacc = -1;
+	const unsigned int jumpframes = 10;
+	unsigned int jumpcounter = 0;
+	Vector2i bodysize(190, 200);
+	
+	bool faceright = false;
+	Clock PressTimer;
+	const float maxfall = 5;   // max fall velocity
+	struct location
+	{
+		int x, y, w, h;
+	}floorlocation[1000];
+	window.setFramerateLimit(60);
+	//getText(window, score);
+	//view
+	View view(FloatRect(0, 0, 1100, 800));
+	View scorev(FloatRect(210, 10, 1100, 800));
+	//gameover
+	RectangleShape gameview;
+	gameview.setSize(Vector2f(900.f, .01f));
+	gameview.setPosition(0, 990);
+	// textures
+	//Texture clockotex;
+	//clockotex.loadFromFile("images/final awee.png");   //load the cclock texter 
+	RectangleShape clockorec, vivo, hur, viewc;
+	//clockorec.setTexture(&clockotex);
+	clockorec.setSize(Vector2f(60, 60));
+	clockorec.setPosition(0, 0);
+	vivo.setSize(Vector2f(640, 0.01));
+	vivo.setPosition(210, 10);
+	hur.setSize(Vector2f(640, 0.01));
+	hur.setPosition(300, 250);
+	viewc.setSize(Vector2f(900, 30));
+	viewc.setPosition(0, 10); 
+	//steps 
+	Texture floortex, tstep1, tstep2;
+	floortex.loadFromFile("buttons/9.png");
+	tstep1.loadFromFile("buttons/18.png");
+	tstep2.loadFromFile("buttons/7.png");
+	RectangleShape floor, step1, step2;
+	floor.setTexture(&floortex);
+	step1.setTexture(&tstep1);
+	step2.setTexture(&tstep2);
+	// background
+	Texture background;
+	background.loadFromFile("background/background.png");
+	background.setRepeated(true);
+	background.setSmooth(true);
+	Sprite backgroun_sprite;
+	backgroun_sprite.setTexture(background);
+	backgroun_sprite.setTextureRect(IntRect(0, 0, 1100, 800));
+	FloatRect fBounds(0.f, 0.f, 1100.f, 800.f); // arbitrary > view height
+	IntRect iBounds(fBounds);        //for repeating background
+	int vy = -6;   //velocity of view of y axis
+	int y = 1;   //for repeating background
+	int h = 100000;   //variable for repeating backgrond upward
+	// tow sides
+	Texture lside, rside;
+	lside.loadFromFile("Background/background.png");
+	Sprite lsidesp;
+	lsidesp.setTexture(lside);
+	rside.loadFromFile("Background/background.png");
+	Sprite rsidesp;
+	rsidesp.setTexture(rside);
+	// texts
+	Font font1;
+	font1.loadFromFile("fonts/CALISTB.TTF");
+	Font font0;
+	font0.loadFromFile("fonts/score.ttf");
+	Font scoref;
+	scoref.loadFromFile("fonts/LCALLIG.TTF");
+	Text lscoret, SCORE, text0;
+	lscoret.setFont(font1);
+	lscoret.setString("(1000 points)");
+	lscoret.setCharacterSize(20);
+	lscoret.setFillColor(sf::Color::Red);
+	lscoret.setStyle(sf::Text::Bold);
+	lscoret.setPosition(Vector2f(20, 190));
+	SCORE.setFont(scoref);
+	SCORE.setFillColor(Color::Red);
+	SCORE.setString("SCORE : ");
+	SCORE.setPosition(210, 10);
+	SCORE.setStyle(Text::Bold);
+	SCORE.setCharacterSize(40);
+	text0.setFont(font0);
+	text0.setStyle(Text::Bold);
+	text0.setPosition(210, 10);
+	text0.setCharacterSize(40);
+	text0.setFillColor(Color::Red);
+	//all texts
+	Text text1, text2, text3, text4, text5, text6, text8;
+	//text1
+	text1.setFont(font1);
+	text1.setString("hurry up");
+	text1.setCharacterSize(100);
+	text1.setFillColor(sf::Color::Yellow);
+	text5.setFont(font1);  // to draw word "hurry up"
+	text5.setString("Alright");  //to load the word hurry up
+	text5.setCharacterSize(100); // in pixels, not points!
+	text5.setFillColor(sf::Color::Yellow); //to set the color of the word hurry up
+	text6.setFont(font1);  // to draw word "hurry up"
+	text6.setString("sweet");  //to load the word hurry up
+	text6.setCharacterSize(100); // in pixels, not points!
+	text6.setFillColor(sf::Color::Yellow); //to set the color of the word hurry up
+	text2.setFont(font1);
+	text2.setCharacterSize(30);
+	text2.setFillColor(Color::Black);
+	text2.setStyle(Text::Bold);
+	Clock clock3; 
+	// levels
+	Texture badges; 
+	badges.loadFromFile("background/rookie.png"); 
+	Sprite badgesp;
+	badgesp.setTexture(badges); 
+	badgesp.setPosition(Vector2f(10, 120));
+	//player 1 running
+	Texture player1_idle[28];
+	for (int i = 0; i < 28; i++)
+	{
+		player1_idle[i].loadFromFile("skater boy/idle/skater boy-idle28 (" + to_string(i + 1) + ").png");
+	}
+	Texture player2_idle;
+	player2_idle.loadFromFile("skater girl/indy grab/skater girl-indy grab_0.png");
+	Texture player2_run2[19];
+	for (int i = 0; i < 18; i++)
+	{
+		player2_run2[i].loadFromFile("skater girl/push single/skater girl-push single_0" + to_string(i + 1) + ".png");
+	}
+	Texture player1_run[19];
+	for (int i = 0; i < 18; i++)
+	{
+		player1_run[i].loadFromFile("skater boy/roll/skater boy-roll" + to_string(i + 1) + ".png");
+	}
+	Texture player2_run[19];
+	for (int i = 0; i < 18; i++)
+	{
+		player2_run[i].loadFromFile("skater girl/roll B/skater girl-roll B_" + to_string(i + 1) + ".png");
+	}
+	Texture player3_run[16];
+	for (int i = 0; i < 15; i++)
+	{
+		player3_run[i].loadFromFile("flatboy/run/Run (" + to_string(i + 1) + ").png");
+	}
+	Texture player3_idle[16];
+	for (int i = 0; i < 15; i++)
+	{
+		player3_idle[i].loadFromFile("flatboy/idle/Idle (" + to_string(i + 1) + ").png");
+	}
+	Texture player3_jump[16];
+	for (int i = 0; i < 15; i++)
+	{
+		player3_jump[i].loadFromFile("flatboy/jump/Jump (" + to_string(i + 1) + ").png");
+	}
+	Texture player_jump[2];
+	player_jump[0].loadFromFile("skater boy/ollie/skater boy-ollie10.png");
+	player_jump[1].loadFromFile("skater boy/ollie/skater boy-ollie3.png");
+	Texture player2_jump[5];
+	player2_jump[0].loadFromFile("skater girl/indy grab/skater girl-indy grab_3.png");
+	player2_jump[1].loadFromFile("skater girl/heel flip/skater girl-heel flip_10.png");
+	player2_jump[2].loadFromFile("skater girl/heel flip/skater girl-heel flip_03.png");
+	player2_jump[3].loadFromFile("skater girl/indy grab/skater girl-indy grab_3.png");
+	player2_jump[4].loadFromFile("skater girl/roll B/skater girl-roll B_18.png");
+	int counter = 0;
+	Sprite player_spriterun;
+	player_spriterun.setTexture(player2_run[counter]);
+	player_spriterun.setPosition(550, 500);
+	if (chooseplayer1) {
+		player_spriterun.setOrigin(Vector2f(80, 100));
+	}
+	else {
+		player_spriterun.setOrigin(Vector2f(127, 100));
+	}
+	float bodysizex = player_spriterun.getLocalBounds().width;
+	float bodysizey = player_spriterun.getLocalBounds().height;
+	// gravity
+	Vector2f velocity(0, 0);
+	double gravity = .9;
+	bool jumping = false;
+	bool running = false;
+	float xpos = (width / 2);
+	float ypos = 500.;
+	
+	bool camera = false;
+	bool viewing = false;
+	//setting positions of each step randomly
+	for (int i = 0; i < 1000; i++)
+	{
+		floorlocation[i].h = 110;
+		if (i < 200)
+		{
+			floorlocation[i].w = rand() % 408;
+			floorlocation[i].x = rand() % 999;
+			if (floorlocation[i].w <= 245)
+				floorlocation[i].w = 245;
+			//else if (floorlocation[i].w>130 && floorlocation[i].w <= 145)
+			//	floorlocation[i].w = 145;
+			else if (floorlocation[i].w > 245 && floorlocation[i].w <= 360)
+				floorlocation[i].w = 360;
+			else if (floorlocation[i].w > 360 && floorlocation[i].w <= 385)
+				floorlocation[i].w = 385;
+			else
+				floorlocation[i].w = 418;
+		}
+		if (i > 200 && i < 300)
+		{
+			if (floorlocation[i].w <= 210)
+				floorlocation[i].w = 310;
+			else if (floorlocation[i].w > 210 && floorlocation[i].w <= 230)
+				floorlocation[i].w = 230;
+			else
+				floorlocation[i].w = 260;
+		}
+		if (i > 300)
+			floorlocation[i].w = 230;
+		floorlocation[i].x = rand() % 999;
+		if (i == 0)
+		{
+			floorlocation[i].x = 90;
+			floorlocation[i].y = height - 110;
+			floorlocation[i].w = 950;
+		}
+		else {
+			floorlocation[i].y = floorlocation[i - 1].y - 150;
+		}
+	}
+	// handil the position of steps
+	for (int i = 1; i < 1000; i++)
+	{
+		if (floorlocation[i].x < 202)
+			floorlocation[i].x = 202;
+		if ((floorlocation[i].x + floorlocation[i].w) > 930)
+			floorlocation[i].x = (930 - floorlocation[i].w);
+		if (i == 50 || i == 100 || i == 150 || i == 200 || i == 250 || i == 300) {
+			floorlocation[i].x = 90;
+			//floorlocation[i].y = height - 110;
+			floorlocation[i].w = 950;
+		}
+	}
+	while (window.isOpen()) {
+		Event event;
+		while (window.pollEvent(event)) {
+			if (event.type == Event::Closed) {
+				window.close();
+			}
+			if (event.type == Event::KeyReleased) {
+				if (event.type == sf::Event::MouseButtonPressed)
+				{
+					if (event.mouseButton.button == sf::Mouse::Right)
+					{
+						std::cout << "the right button was pressed" << std::endl;
+						std::cout << "mouse x: " << event.mouseButton.x << std::endl;
+						std::cout << "mouse y: " << event.mouseButton.y << std::endl;
+					}
+				}
+				if (event.key.code == Keyboard::Space) {
+					SoundEffects("audio/src_sfx_jump.wav");
+					if (chooseplayer1 == true) {
+						player_spriterun.setTexture(player1_run[1]);
+					}
+					else {
+						player_spriterun.setTexture(player2_run[0]);
+					}
+					
+					intro = false;
+				}
+				if (event.key.code == Keyboard::Right) {
+					running = false;
+					faceright = true;
+					intro = false;
+					if (chooseplayer1 == true) {
+						player_spriterun.setTexture(player1_run[1]);
+					}
+					else {
+						player_spriterun.setTexture(player2_run[0]);
+					}
+				}
+
+				if (event.key.code == Keyboard::Left) {
+					running = false;
+					intro = false;
+					if (chooseplayer1 == true) {
+						player_spriterun.setTexture(player1_run[1]);
+					}
+					else {
+						player_spriterun.setTexture(player2_run[0]);
+					}
+				}
+			}
+		}
+		if (Keyboard::isKeyPressed(Keyboard::Escape)) {
+			SoundEffects("audio/rsrc_files_on.wav");
+			pauseMenu();
+		}
+		y += 10 * height;
+		//deltaTime = c.restart().asSeconds(); //clock restarts time at each frame
+		backgroun_sprite.setPosition(fBounds.left, fBounds.top - 1000.f - h); //for repeating background upward
+		lsidesp.setPosition(fBounds.left, fBounds.top - 1000.f - h); //for repeating left border upward
+		rsidesp.setPosition(fBounds.left + 940, fBounds.top - 1000.f - h); //for repeating right border upward
+		backgroun_sprite.setTextureRect(IntRect(0, 0, 1100, y));  //repeat background
+		lsidesp.setTextureRect(IntRect(0, 0, 200, y));    //repeat left border
+		rsidesp.setTextureRect(IntRect(0, 0, 180, y));   //repeat right border
+		scorest = to_string(score);
+		text0.setString(scorest);
+		if (intro) {
+			if (chooseplayer1 == true) {
+			if (counter < 27) {
+				counter++;
+			}
+			else {
+				counter = 0;
+			}
+			player_spriterun.setTexture(player1_idle[counter]);
+			}
+			else {
+				player_spriterun.setTexture(player2_idle);
+			}
+
+		}
+		if (Keyboard::isKeyPressed(Keyboard::Right))
+		{
+			faceright = true;
+			intro = false;
+			running = true;
+			velocity.x = speed - 4;
+			player_spriterun.setScale(1, 1);
+			if (chooseplayer1 == true) {
+				if (counter < 17) {
+					counter++;
+				}
+				else {
+					counter = 0;
+				}
+				player_spriterun.setTexture(player1_run[counter]);
+			}
+			else {
+				if (counter < 17) {
+					counter++;
+				}
+				else {
+					counter = 0;
+				}
+				player_spriterun.setTexture(player2_run2[counter]);
+			}
+			if (Keyboard::isKeyPressed(Keyboard::Space)) {
+				
+				if (chooseplayer1 == true) { 
+					player_spriterun.setTexture(player_jump[0]); 
+				}
+				else {
+						player_spriterun.setTexture(player2_jump[0]); 
+				}
+			}
+		}
+		
+		if (Keyboard::isKeyPressed(Keyboard::Left))
+		{
+			faceright = false;
+			intro = false;
+			running = true;
+			velocity.x = -speed + 4;
+			player_spriterun.setScale(-1, 1);
+			if (chooseplayer1 == true) {
+				if (counter < 17) {
+					counter++;
+				}
+				else {
+					counter = 0;
+				}
+				player_spriterun.setTexture(player1_run[counter]);
+			}
+			else {
+				if (counter < 17) {
+					counter++;
+				}
+				else {
+					counter = 0;
+				}
+				player_spriterun.setTexture(player2_run2[counter]);
+			}
+			if (Keyboard::isKeyPressed(Keyboard::Space)) {
+				
+				if (chooseplayer1 == true) {
+					player_spriterun.setTexture(player_jump[0]);
+				}
+				else {
+					player_spriterun.setTexture(player2_jump[0]);
+				}
+			}
+		}
+		if (Keyboard::isKeyPressed(Keyboard::Space))
+		{
+			
+			intro = false;
+			if (jumping == false)
+			{
+				velocity.y = -18.;
+				jumping = true;
+				if (chooseplayer1 == true) {
+					player_spriterun.setTexture(player_jump[1]);
+				}
+				else {
+					player_spriterun.setTexture(player2_jump[1]);
+				}
+			}
+		}
+
+		if (player_spriterun.getPosition().y < height)
+		{
+			velocity.y += gravity;
+			ypos = player_spriterun.getPosition().y;
+		}
+		else if (player_spriterun.getPosition().y >= height)
+		{
+			player_spriterun.setPosition(player_spriterun.getPosition().x, height);
+			jumping = false;
+			ypos = player_spriterun.getPosition().y;
+		}
+		xpos += velocity.x;
+		ypos += velocity.y;
+		//cout << xpos << endl;
+		//cout << "ypos :"<<ypos << endl;
+		if (xpos > 932) {
+			velocity.x = 0;
+			xpos = 932;
+		}
+		if (xpos < 235) {
+			velocity.x = 0;
+			xpos = 235;
+		}
+		// logic update end
+		// update the position
+		if ((velocity.x >= 10 || velocity.x <= -10) && jumpcounter >= 1)
+		{
+			velocity.y -= 1;
+		}
+		else if ((velocity.x >= 7 && velocity.x<10 || velocity.x <= -7 && velocity.x>-10) && jumpcounter >= 1)
+		{
+			velocity.y -= 1;
+		}
+		else
+		{
+			player_spriterun.setRotation(0);
+
+		}
+		int viewspeed = -4;
+		// VIEW view (0,0, 1100, 800)
+		
+		if (ypos < 100) {
+			//PressTimer.restart();
+			if (PressTimer.getElapsedTime().asSeconds() >= 30) {
+				viewspeed -= 1;
+				view.move(0, viewspeed);
+				gameview.move(0, viewspeed);
+				text0.move(0, viewspeed);
+				SCORE.move(0, viewspeed);
+				cout << "hurrryyyy" << endl;
+				PressTimer.restart();
+			}
+			else if(PressTimer.getElapsedTime().asSeconds() < 10){
+				view.move(0, viewspeed);
+				gameview.move(0, viewspeed);
+				text0.move(0, viewspeed);
+				SCORE.move(0, viewspeed);
+				PressTimer.restart();
+			}
+			window.setView(view);
+			cout << viewspeed<<endl;
+			
+		}
+		int num = 0;
+		string t2;
+		
+		
+		if (!running && !jumping) {
+			velocity.x = 0;
+		}
+		player_spriterun.move(velocity.x, velocity.y);
+		// logic handling
+		if (player_spriterun.getGlobalBounds().intersects(gameview.getGlobalBounds()))
+		{
+			startsound.pause();
+			window.close(); 
+			gameover();
+		}
+		if (velocity.y > 0)
+		{
+			for (int i = 0; i < 1000; i++)
+			{
+				if ((xpos + .5 * bodysize.x > floorlocation[i].x + 100.) &&
+					(xpos - (bodysize.x) < (floorlocation[i].x - 200) + (floorlocation[i].w))
+					&& (ypos + .5 * bodysize.y > (floorlocation[i].y + 55))
+					&& (ypos + .5 * bodysize.y < (floorlocation[i].y - 20) + (floorlocation[i].h - 10)))
+				{
+					xpos = xpos;
+					ypos = 0;
+					velocity.y = 0.;
+					velocity.x = 0.;
+					score = i * 10;
+					cout << score << endl;
+					ypos = floorlocation[i].y;
+					player_spriterun.move({ 0, -.9 });
+
+					//cout << "floor location: " << floorlocation[i].y << endl;
+					if (Keyboard::isKeyPressed(Keyboard::Space)) {
+						velocity.y += jumpacc * 18;
+						jumping = true;
+						if (chooseplayer1 == true) {
+							player_spriterun.setTexture(player_jump[1]);
+						}
+						else {
+							player_spriterun.setTexture(player2_jump[1]);
+						}
+					}
+				}
+			}
+		}
+		// inside main loop
+		// 
+		// rendering part if the main game loop
+		window.clear(sf::Color::White);
+
+		// draw things
+		
+		window.draw(backgroun_sprite);
+		window.draw(player_spriterun);
+		for (int i = 0; i < 1000; i++)
+		{
+			floor.setSize(Vector2f(floorlocation[i].w + 10, floorlocation[i].h + 30));
+			step1.setSize(Vector2f(floorlocation[i].w + 10., floorlocation[i].h + 10));
+			step2.setSize(Vector2f(floorlocation[i].w + 10., floorlocation[i].h + 30.));
+			floor.setPosition(floorlocation[i].x, floorlocation[i].y );
+			step1.setPosition(Vector2f(floorlocation[i].x, floorlocation[i].y));
+			step2.setPosition(Vector2f(floorlocation[i].x, floorlocation[i].y));
+			if (i < 50)
+				window.draw(step1);
+			else if (i >= 50 && i < 100)
+				window.draw(step2);
+			else
+				window.draw(floor);
+		}
+		window.draw(player_spriterun);
+		window.draw(lsidesp);
+		window.draw(rsidesp);
+		window.draw(lscoret);
+		//window.draw(SCORE);
+		window.draw(badgesp);
+		window.draw(text0); 
+		window.draw(gameview);
+		for (int i = 0; i < 1000; i++)
+		{
+			if (i % 10 == 0)
+			{
+				num = i;
+				t2 = to_string(num);
+				text2.setString(t2);
+				text2.setPosition(floorlocation[i].x + 0.5 * floorlocation[i].w - 10, floorlocation[i].y + 40);
+				window.draw(text2);
+			}
+		}
+		window.draw(player_spriterun);
+		window.display();
+	}
+}
+void Controls() {
+	sf::RenderWindow window7(sf::VideoMode(1100, 800), "SFML WORK!");
+	window7.setFramerateLimit(40);
+	// Controls Menu
+	Font instructionsf;
+	instructionsf.loadFromFile("fonts/ITCKRIST.TTF");
+	Text Intructions2;
+	Intructions2.setFont(instructionsf);
+	Intructions2.scale(01.f, 1.f);
+	Intructions2.setString("PRESS RIGHT, LEFT OR SPACE AND FOCUS ON THE PECTURES");
+
+	Intructions2.setPosition(20, 0);
+	Intructions2.setFillColor(Color::Red);
+	Intructions2.setStyle(Text::Bold);
+	Intructions2.setStyle(Text::Underlined);
+	// Cursor
+	CircleShape Cursor;
+	Cursor.setPosition(96.f, 186.f);
+	Cursor.setRadius(5.f);
+	Cursor.setFillColor(Color::Red);
+	Texture controltex;
+	controltex.loadFromFile("background/366000.jpg");
+	Sprite ctrlbg(controltex);
+	ctrlbg.setTextureRect(IntRect(0, 0, 1100, 800));
+	Texture keyboardt, righkt, leftkt, character1t, character2t, character3t, screen1t, screen2t, screen3t;
+	keyboardt.loadFromFile("background/spacekey.png");
+	righkt.loadFromFile("background/rightkey.png");
+	leftkt.loadFromFile("background/leftkey.png");
+	character1t.loadFromFile("background/hero2.png");
+	character2t.loadFromFile("background/old character.png");
+	character3t.loadFromFile("background/hero.png");
+	screen1t.loadFromFile("background/moveup.png");
+	screen1t.loadFromFile("background/moveleft.png");
+	screen1t.loadFromFile("background/moveright.png");
+	Sprite keyboard(keyboardt), rightk(righkt), leftk(leftkt), character1(character1t), character2(character2t), character3(character3t), screen1(screen1t), screen2(screen2t), screen3(screen3t);
+	keyboard.setPosition(387, 41);
+	rightk.setPosition(772, 185);
+	leftk.setPosition(245, 185);
+	character1.setPosition(808, 261);
+	character2.setPosition(230, 510);
+	character3.setPosition(558, 405);
+	Texture rscreent, lscreent, upscreent;
+	rscreent.loadFromFile("background/moverightscreen.png");
+	lscreent.loadFromFile("background/moveleftscreen.png");
+	upscreent.loadFromFile("background/moveupscreen.png");
+	Sprite screen(upscreent);
+	screen.setTextureRect(IntRect(0, 0, 455, 333));
+	screen.setPosition(320, 61);
+
+	while (window7.isOpen())
+	{
+		sf::Event event;
+
+		while (window7.pollEvent(event))
+		{
+			if (event.type == sf::Event::MouseButtonPressed)
+			{
+				if (event.mouseButton.button == sf::Mouse::Right)
+				{
+					std::cout << "the right button was pressed" << std::endl;
+					std::cout << "mouse x: " << event.mouseButton.x << std::endl;
+					std::cout << "mouse y: " << event.mouseButton.y << std::endl;
+				}
+			}
+			if (event.type == Event::Closed) {
+				window7.close();
+			}
+		}
+
+		{
+			if (Keyboard::isKeyPressed(Keyboard::Escape))
+			{
+				window7.close();
+				mainmenu();
+
+			}
+
+			//CreditsText.move(0, -1);
+			window7.clear(Color::White);
+			window7.draw(ctrlbg);
+			window7.draw(Intructions2);
+			window7.draw(character1);
+			window7.draw(character2);
+			window7.draw(character3);
+			if (Keyboard::isKeyPressed(Keyboard::Right)) {
+				screen.setTexture(rscreent);
+			}
+			if (Keyboard::isKeyPressed(Keyboard::Left)) {
+				screen.setTexture(lscreent);
+			}
+			if (Keyboard::isKeyPressed(Keyboard::Space)) {
+				screen.setTexture(upscreent);
+			}
+			window7.draw(screen); 
+			window7.draw(keyboard); 
+			window7.draw(rightk);
+			window7.draw(leftk);
+			window7.display(); 
+		} 
+	} 
+} 
+void Credits() {
+	sf::RenderWindow window6(sf::VideoMode(1100, 800), "ICY TOWER", Style::Default);
+	window6.setFramerateLimit(60);
+	Font instructionsf;
+	instructionsf.loadFromFile("fonts/GOUDYSTO.TTF");
+	Texture creditsbgt;
+	creditsbgt.loadFromFile("background/16244.jpg");
+	Sprite creditsbg(creditsbgt);
+	creditsbg.setTextureRect(IntRect(200, 0, 2500, 1111));
+	Text CreditsText;
+	CreditsText.setFont(instructionsf);
+	CreditsText.scale(1.5f, 1.5f);
+	CreditsText.setPosition(30, 400);
+	CreditsText.setString("Head of Software Development  :\n \n Roaa Mamdouh \n Souhaila Mohammed \n Ahmed ibrahim \n Nada Mohamed \n Nourhan \n Nadia Ayman \n Nada Yaser \
+							\n\n Head of Graphics Department :\n \n Roaa Mamdouh  \n  \n  \
+							\n\n Special Thanks to : \n \n Abdelrhman Sobhy \n \n Dr / Mohammed Essam ");
+	CreditsText.setFillColor(Color::White);
+	CreditsText.setCharacterSize(18);
+	while (window6.isOpen())
+	{
+		sf::Event event;
+
+		while (window6.pollEvent(event))
+		{
+			if (event.type == Event::Closed) {
+				window6.close();
+			}
+		}
+
+		if (Keyboard::isKeyPressed(Keyboard::Escape) || CreditsText.getPosition().y < -(CreditsText.getGlobalBounds().height + 40))
+		{
+			window6.close();
+			mainmenu();
+
+			CreditsText.setPosition(100, 400);
+		}
+
+		CreditsText.move(0, -1);
+		if (Keyboard::isKeyPressed(Keyboard::Down)) {
+			CreditsText.move(0, -2);
+		}
+		window6.clear();
+		window6.draw(creditsbg);
+		window6.draw(CreditsText);
+		window6.display();
+	}
+}
+void gameover()
+{
+	music = false;
+	sf::RenderWindow window5(sf::VideoMode(1100, 800), "SFML WORK!");
+	Font pausefont;
+	pausefont.loadFromFile("fonts/CALIST.TTF");
+	//GameOver 
+	Text Game, Over;
+	Game.setString("Game");
+	Game.setFont(pausefont);
+	Game.scale(1.5f, 1.5f);
+	Game.setPosition(-(Game.getGlobalBounds().width + 5), window5.getSize().y / 2);
+	Over.setString("Over");
+	Over.setFont(pausefont);
+	Over.scale(1.5f, 1.5f);
+	Over.setPosition(window5.getSize().x, window5.getSize().y / 2);
+
+	sf::SoundBuffer buffer;
+	if (!buffer.loadFromFile("audio/Directed by Robert B. Weide.wav")) {
+		cout << "SORRY ! \n";
+	}
+	Sound gameovers;
+	gameovers.setBuffer(buffer);
+	gameovers.setVolume(70);
+	gameovers.setLoop(true);
+	gameovers.play();
+	Texture bggameover;
+	bggameover.loadFromFile("background/gameover (2).jpg");
+
+	Sprite gameover(bggameover);
+	gameover.setPosition(150, 0);
+	
+	Text tryagaint, menut;
+	menut.setFont(pausefont);
+	tryagaint.setFont(pausefont);
+	tryagaint.setString("TRY AGAIN");
+	menut.setString("MENU");
+	tryagaint.setPosition(440, 275);
+	menut.setPosition(480, 425);
+	tryagaint.setFillColor(Color::Blue);
+	menut.setFillColor(Color::White);
+	// Cursor
+	CircleShape Cursor2;
+	Cursor2.setPosition(440.f, 275);
+	Cursor2.setRadius(5.f);
+	Cursor2.setFillColor(Color::White);
+	// buttons
+	Texture button1tex, button2tex;
+	button1tex.loadFromFile("buttons/18 - Copy.png");
+	button2tex.loadFromFile("buttons/18 - Copy.png");
+	Sprite button1(button1tex), button2(button2tex);
+	button1.setPosition(435.f, 265.f);
+	button2.setPosition(435.f, 415.f);
+	Clock PressTimer;
+	while (window5.isOpen())
+	{
+		sf::Event event;
+
+		while (window5.pollEvent(event))
+		{
+			switch (event.type)
+            case sf::Event::Closed:
+				window5.close();
+
+		}
+		if (Keyboard::isKeyPressed(Keyboard::Down) && Cursor2.getPosition().y > 274 && PressTimer.getElapsedTime().asSeconds() > 0.2)
+		{
+			SoundEffects("audio/jumpland.wav");
+			Cursor2.move(0.f, 150.f);
+			tryagaint.setFillColor(Color::White);
+			menut.setFillColor(Color::Blue);
+			PressTimer.restart();
+			if (Keyboard::isKeyPressed(Keyboard::Down) && Cursor2.getPosition().y > 424) {
+				Cursor2.setPosition(Cursor2.getPosition().x, 424);
+			}
+		}
+		if (Keyboard::isKeyPressed(Keyboard::Up) && Cursor2.getPosition().y < 426 && PressTimer.getElapsedTime().asSeconds() > 0.2)
+		{
+			SoundEffects("audio/jumpland.wav");
+			Cursor2.move(0.f, -150.f);
+			tryagaint.setFillColor(Color::Blue);
+			menut.setFillColor(Color::White);
+			PressTimer.restart();
+			if (Keyboard::isKeyPressed(Keyboard::Up) && Cursor2.getPosition().y < 275) {
+				Cursor2.setPosition(Cursor2.getPosition().x, 275);
+			}
+		}
+		if (Keyboard::isKeyPressed(Keyboard::Return) && (Cursor2.getPosition().y == 275 || Cursor2.getPosition().y == 275)) {
+			gameovers.pause();
+			window5.close();
+			Start();
+		}
+		if (Keyboard::isKeyPressed(Keyboard::Return) && Cursor2.getPosition().y == 424) {
+			gameovers.pause();
+			window5.close();
+			mainmenu();
+		}
+		window5.clear();
+		window5.draw(gameover);
+		window5.draw(button1);
+		window5.draw(button2);
+		window5.draw(Cursor2);
+		window5.draw(menut);
+		window5.draw(tryagaint);
+		window5.draw(Game);
+		window5.draw(Over);
+		
+		window5.display();
+	}
+
+}
+void pauseMenu()
+{
+	Clock PressTimer;
+	RenderWindow window1(sf::VideoMode(600, 600), "PAUSE");
+	Texture pausemenutt;
+	pausemenutt.loadFromFile("background/3660.jpg");
+	Sprite pausemenu(pausemenutt);
+	pausemenu.setTextureRect(IntRect(100, 100, 1366, 768));
+	//text 
+	Font pausefont;
+	pausefont.loadFromFile("fonts/BAUHS93.TTF");
+	Text presumet, pmunut, prestartt;
+	presumet.setFont(pausefont);
+	pmunut.setFont(pausefont);
+	prestartt.setFont(pausefont);
+	presumet.setString("RESUME");
+	pmunut.setString("MENU");
+	prestartt.setString("RESTART");
+	presumet.setPosition(250, 142);
+	pmunut.setPosition(260, 292);
+	prestartt.setPosition(245, 442);
+	presumet.setFillColor(Color::White);
+	pmunut.setFillColor(Color::White);
+	prestartt.setFillColor(Color::White);
+	// Cursor
+	CircleShape Cursor2;
+	Cursor2.setPosition(240.f, 142.f);
+	Cursor2.setRadius(5.f);
+	Cursor2.setFillColor(Color::Black);
+	// buttons
+	Texture button1tex, button2tex, button3tex;
+	button1tex.loadFromFile("buttons/18 - Copy.png");
+	button2tex.loadFromFile("buttons/18 - Copy.png");
+	button3tex.loadFromFile("buttons/18 - Copy.png");
+	Sprite button1(button1tex), button2(button2tex), button3(button3tex);
+	button1.setPosition(205.f, 65.f);
+	button2.setPosition(205.f, 215.f);
+	button3.setPosition(205.f, 365.f);
+	while (window1.isOpen())
+	{
+		sf::Event event;
+		if (Keyboard::isKeyPressed(Keyboard::Down) && Cursor2.getPosition().y > 141 && PressTimer.getElapsedTime().asSeconds() > 0.2)
+		{
+			SoundEffects("audio/jumpland.wav");
+			Cursor2.move(0.f, 150.f);
+			if (Cursor2.getPosition().y == 142)
+			{
+				presumet.setFillColor(Color::White);
+				pmunut.setFillColor(Color::Blue);
+			}
+
+			PressTimer.restart();
+			if (Keyboard::isKeyPressed(Keyboard::Down) && Cursor2.getPosition().y > 442) {
+				Cursor2.setPosition(Cursor2.getPosition().x, 442);
+			}
+		}
+		if (Keyboard::isKeyPressed(Keyboard::Up) && Cursor2.getPosition().y < 443 && PressTimer.getElapsedTime().asSeconds() > 0.2)
+		{
+			Cursor2.move(0.f, -150.f);
+			SoundEffects("audio/jumpland.wav");
+			PressTimer.restart();
+			if (Keyboard::isKeyPressed(Keyboard::Up) && Cursor2.getPosition().y < 143) {
+				Cursor2.setPosition(Cursor2.getPosition().x, 143);
+			}
+			 
+		}
+		if (Keyboard::isKeyPressed(Keyboard::Return) && Cursor2.getPosition().y == 142) {
+			SoundEffects("audio/rsrc_files_on.wav");
+			window1.close();
+			intro=true;
+		}
+		if (Keyboard::isKeyPressed(Keyboard::Return) && Cursor2.getPosition().y == 292) {
+			SoundEffects("audio/rsrc_files_on.wav");
+			window1.close();
+			//window.close();
+			mainmenu();
+		}
+		if (Keyboard::isKeyPressed(Keyboard::Return) && Cursor2.getPosition().y == 442) {
+			SoundEffects("audio/rsrc_files_on.wav");
+			window1.close();
+			//window.close();
+			Start();
+		}
+		while (window1.pollEvent(event))
+		{
+			if (event.type == sf::Event::MouseButtonPressed)
+			{
+				if (event.mouseButton.button == sf::Mouse::Right)
+				{
+					std::cout << "the right button was pressed" << std::endl;
+					std::cout << "mouse x: " << event.mouseButton.x << std::endl;
+					std::cout << "mouse y: " << event.mouseButton.y << std::endl;
+				}
+
+			}
+			if (event.type == Event::KeyReleased) {
+				if (event.key.code == Keyboard::Return && (Cursor2.getPosition().y == 142 || Cursor2.getPosition().y == 143)) {
+					window1.close();
+				}
+			}
+		}
+		window1.clear();
+		window1.draw(pausemenu);
+		window1.draw(button1);
+		window1.draw(button3);
+		window1.draw(button2);
+		window1.draw(presumet);
+		window1.draw(pmunut);
+		window1.draw(prestartt);
+		window1.draw(Cursor2);
+		window1.display();
+	}
+}
+
+
