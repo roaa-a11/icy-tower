@@ -38,5 +38,6 @@ icy tower is a desktop game created with c++ basics and sfml library
 
 - game over
 
-- ![Screenshot 2021-07-12 184114](https://user-images.githubusercontent.com/78798521/125326534-724e1a80-e342-11eb-9dcc-305103781602.png)
+![Screenshot 2021-07-12 184243](https://user-images.githubusercontent.com/78798521/125337409-42594400-e34f-11eb-9347-4705cfc049c5.png)
+
 
